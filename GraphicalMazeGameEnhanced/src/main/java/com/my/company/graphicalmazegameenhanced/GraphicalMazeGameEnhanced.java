@@ -22,7 +22,7 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
     private JLabel winLabel;
 
     private int currentLevel = 1;
-    private final int MAX_LEVEL = 4;  // FINAL LEVEL IS 4
+    private final int MAX_LEVEL = 3;  // FINAL LEVEL IS NOW 3
     private char[][] maze;
     private int playerX = 1, playerY = 1, playerFacing = 2;
 
@@ -78,7 +78,7 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
         winLabel = new JLabel(
             "<html><div style='text-align:center; padding:40px;'>" +
             "<h1 style='color:#ffcc00; font-size:40px;'>CURSE SHATTERED!</h1>" +
-            "<p style='color:#ffcc00; font-size:22px;'>You defeated the Warden and saved the realm!</p>" +
+            "<p style='color:#ffcc00; font-size:22px;'>You saved the realm and broke the curse!</p>" +
             "</div></html>",
             SwingConstants.CENTER
         );
@@ -272,7 +272,7 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
     }
 
     /* --------------------------------------------------------------
-       KEY HANDLING – FINAL LEVEL 4 LOGIC
+       KEY HANDLING – FINAL WIN ON LEVEL 3
        -------------------------------------------------------------- */
     private void handleKeyPress(KeyEvent e) {
         if (state == GameState.PAUSED && e.getKeyCode() == KeyEvent.VK_P) {
@@ -289,7 +289,7 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
             case KeyEvent.VK_A, KeyEvent.VK_LEFT -> { newY--; newFacing = 3; }
             case KeyEvent.VK_S, KeyEvent.VK_DOWN -> { newX++; newFacing = 2; }
             case KeyEvent.VK_D, KeyEvent.VK_RIGHT -> { newY++; newFacing = 1; }
-            case KeyEvent.VK_SPACE -> { interactWithSageOrBoss(); return; }
+            case KeyEvent.VK_SPACE -> { interactWithSage(); return; }
             case KeyEvent.VK_V -> { saveLoadManager.saveGame(this); return; }
             case KeyEvent.VK_L -> { saveLoadManager.loadGame(this); return; }
             case KeyEvent.VK_H -> { showHelp(); return; }
@@ -300,12 +300,11 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
         if (isValidMove(newX, newY)) {
             char target = maze[newX][newY];
 
-            /* ---------- ITEM PICK-UP (LEVEL 4: 'H') ---------- */
+            /* ---------- ITEM PICK-UP ---------- */
             char requiredItem = switch (currentLevel) {
                 case 1 -> 'A';
                 case 2 -> 'S';
                 case 3 -> 'C';
-                case 4 -> 'H';  // FINAL ITEM
                 default -> '.';
             };
 
@@ -316,7 +315,6 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
                     case 1 -> "Crystal of Eternity";
                     case 2 -> "Ancient Altar Seal";
                     case 3 -> "Celestial Spire";
-                    case 4 -> "Warden’s Heart";
                     default -> "Unknown Item";
                 };
                 storyManager.appendToLog("You acquired the " + itemName + "!\n");
@@ -325,20 +323,20 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
                 gamePanel.repaint();
             }
 
-            /* ---------- EXIT – WIN ON LEVEL 4 ---------- */
+            /* ---------- EXIT – WIN ON LEVEL 3 ---------- */
             if (target == 'E') {
-                if (hasObjectiveItem) {
-                    if (currentLevel < MAX_LEVEL) {
-                        loadLevel(currentLevel + 1);
-                    } else {
-                        showWinScreen();  // WIN!
-                    }
-                    return;
-                } else {
-                    storyManager.appendToLog("Exit is sealed without the Warden’s Heart.\n");
+                if (!hasObjectiveItem) {
+                    storyManager.appendToLog("Exit is sealed without the item.\n");
                     soundManager.playEvent("locked");
                     return;
                 }
+
+                if (currentLevel < MAX_LEVEL) {
+                    loadLevel(currentLevel + 1);
+                } else {
+                    showWinScreen();  // WIN ON LEVEL 3!
+                }
+                return;
             }
 
             /* ---------- MONSTERS / TRAPS ---------- */
@@ -357,37 +355,29 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
     }
 
     /* --------------------------------------------------------------
-       INTERACTION – BOSS ON LEVEL 4
+       INTERACTION – SAGE ONLY
        -------------------------------------------------------------- */
-    private void interactWithSageOrBoss() {
+    private void interactWithSage() {
         int[] sage = MazeData.getSagePositionForLevel(currentLevel);
         if (Math.abs(playerX - sage[0]) <= 1 && Math.abs(playerY - sage[1]) <= 1 &&
             (playerX != sage[0] || playerY != sage[1])) {
-            interactWithSage();
+            soundManager.playEvent("sage");
+            sageInteractionStage++;
+            String msg = switch (currentLevel) {
+                case 1 -> sageInteractionStage == 1 ? "Sage: The Crystal lies deep within. Beware the guardians!" : "Sage: Hurry, the curse grows!";
+                case 2 -> sageInteractionStage == 1 ? "Sage: Seal the altar to weaken the curse." : "Sage: The forest hides many eyes.";
+                case 3 -> sageInteractionStage == 1 ? "Sage: The Spire awaits your crystal!" : "Sage: The stars align — victory is near!";
+                default -> "";
+            };
+            storyManager.showSpeechBubble(msg);
+            storyManager.appendToLog(msg + "\n");
             return;
-        }
-
-        if (currentLevel == 4) {
-            int[] boss = monsterManager.getBossPosition();
-            if (boss != null && Math.abs(playerX - boss[0]) <= 1 && Math.abs(playerY - boss[1]) <= 1 &&
-                (playerX != boss[0] || playerY != boss[1])) {
-                if (hasObjectiveItem) {
-                    monsterManager.killBoss();
-                    maze[boss[0]][boss[1]] = '.';
-                    storyManager.appendToLog("Warden defeated! The curse is broken!\n");
-                    soundManager.playEvent("boss_defeat");
-                } else {
-                    storyManager.appendToLog("You need the Warden’s Heart to challenge the Warden!\n");
-                    soundManager.playEvent("locked");
-                }
-                return;
-            }
         }
         storyManager.appendToLog("Nothing to interact with.\n");
     }
 
     /* --------------------------------------------------------------
-       LOAD LEVEL – FINAL LEVEL 4
+       LOAD LEVEL – FINAL IS LEVEL 3
        -------------------------------------------------------------- */
     public void loadLevel(int level) {
         currentLevel = level;
@@ -401,36 +391,20 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
         String title = switch (level) {
             case 1 -> "Level 1: The Cursed Labyrinth";
             case 2 -> "Level 2: Enchanted Forest";
-            case 3 -> "Level 3: Celestial Ruins";
-            case 4 -> "Level 4: Warden’s Vault (FINAL BOSS)";
+            case 3 -> "Level 3: Celestial Ruins (FINAL)";
             default -> "";
         };
         String objective = switch (level) {
             case 1 -> "Find the Crystal of Eternity.";
             case 2 -> "Seal the Ancient Altar.";
-            case 3 -> "Place the Celestial Spire.";
-            case 4 -> "Steal the Warden’s Heart and escape!";
+            case 3 -> "Place the Celestial Spire and escape!";
             default -> "";
         };
         currentObjective = objective;
 
         storyManager.appendToLog("\n=== " + title + " ===\n" + objective + "\n");
-        MazeData.addRandomDecorations(maze, level == 1 ? 5 : level == 2 ? 10 : level == 3 ? 8 : 6);
+        MazeData.addRandomDecorations(maze, level == 1 ? 5 : level == 2 ? 10 : 8);
         gamePanel.repaint();
-    }
-
-    private void interactWithSage() {
-        soundManager.playEvent("sage");
-        sageInteractionStage++;
-        String msg = switch (currentLevel) {
-            case 1 -> sageInteractionStage == 1 ? "Sage: The Crystal lies deep within. Beware the guardians!" : "Sage: Hurry, the curse grows!";
-            case 2 -> sageInteractionStage == 1 ? "Sage: Seal the altar to weaken the curse." : "Sage: The forest hides many eyes.";
-            case 3 -> sageInteractionStage == 1 ? "Sage: The Spire awaits your crystal!" : "Sage: The stars align for you.";
-            case 4 -> sageInteractionStage == 1 ? "Sage: The Warden’s Heart is the key to ending the curse!" : "Sage: Defeat the Warden and escape!";
-            default -> "";
-        };
-        storyManager.showSpeechBubble(msg);
-        storyManager.appendToLog(msg + "\n");
     }
 
     private boolean isValidMove(int x, int y) {
@@ -441,7 +415,6 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
     private void checkStoryTriggers() {
         char item = switch (currentLevel) {
             case 1 -> 'A'; case 2 -> 'S'; case 3 -> 'C';
-            case 4 -> 'H';
             default -> '.';
         };
         for (int i = -2; i <= 2; i++) {
@@ -460,7 +433,7 @@ public class GraphicalMazeGameEnhanced extends JFrame implements ActionListener 
 
     private void showHelp() {
         JOptionPane.showMessageDialog(this,
-            "Controls:\nWASD / Arrows: Move\nSPACE: Interact\nP: Pause\nV: Save\nL: Load\nH: Help",
+            "Controls:\nWASD / Arrows: Move\nSPACE: Talk to Sage\nP: Pause\nV: Save\nL: Load\nH: Help",
             "Help", JOptionPane.INFORMATION_MESSAGE);
     }
 
